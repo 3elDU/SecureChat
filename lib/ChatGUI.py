@@ -45,12 +45,12 @@ class KeyPrompt:
 
 
 class SoundPlayerThread(Thread):
-	def __init__(self):
-		Thread.__init__(self)
+    def __init__(self):
+        Thread.__init__(self)
 
-	def run(self):
-		PlaySound("beep.wav", SND_FILENAME)
-		exit(0)
+    def run(self):
+        PlaySound("beep.wav", SND_FILENAME)
+        exit(0)
 
 
 class Main:
@@ -83,7 +83,7 @@ class Main:
 
         self.windowClosed = False
         self.root = Tk()
-        self.root.title('SecureChat 0.71 - ' + self.nick)
+        self.root.title('SecureChat 0.72 - ' + self.nick)
         self.root["bg"] = "black"
         self.root.resizable(False, False)
 
