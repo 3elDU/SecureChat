@@ -1,0 +1,2 @@
+# SecureChat
+Simple chat program.
