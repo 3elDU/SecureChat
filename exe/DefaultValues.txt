@@ -1,0 +1,4 @@
+192.168.0.104
+16300
+Bajass
+EncryptionKey.txt
