@@ -1,15 +1,28 @@
+from tkinter import *
+
 
 class Main:
-    def __init__(self, labelsList):
-        self.labels = labelsList
-        self.length = len(labelsList)
+    def __init__(self, texts: Text):
+        self.texts = texts
 
-    def addNew(self, value):
-        for i in range(self.length):
-            if i-1 >= 0:
-                self.labels[i-1] = self.labels[i]
+        self.added = 1
 
-        self.labels[self.length-1] = value
+    def addNew(self, value, newLine=True):
 
-    def getList(self):
-        return self.labels
+        if self.added >= 256:
+            self.texts.configure(state=NORMAL)
+            self.texts.delete('1.0', '1.end + 1 char')
+            self.texts.configure(state=DISABLED)
+            self.added -= 2
+
+        self.texts.configure(state=NORMAL)
+
+        if newLine:
+            self.texts.insert(END, '\n')
+        self.texts.insert(END, value)
+
+        self.texts.yview_scroll(1024, UNITS)
+
+        self.texts.configure(state=DISABLED)
+
+        self.added += 1

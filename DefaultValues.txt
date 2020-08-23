@@ -1,4 +1,4 @@
 192.168.0.104
 16300
-Bajass
-C:\PyCharm\SecureChat\Key.txt
+3elDU
+C:\PyCharm\SecureChat\KeyNew.txt
