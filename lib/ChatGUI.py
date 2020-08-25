@@ -6,11 +6,18 @@ from lib import ByteEncryptionEngine
 from lib.Packet import Packet
 from tkinter.messagebox import *
 from tkinter.filedialog import *
+from PIL import Image, ImageTk
 from winsound import *
 from threading import Thread
 import socket
 import traceback
 import time
+
+
+MAX_IMG_WIDTH = 600
+MAX_IMG_HEIGHT = 180
+
+PHOTOS = []
 
 
 class KeyPrompt:
@@ -67,7 +74,78 @@ class SoundPlayerThread(Thread):
         exit(0)
 
 
+"""
+class ReceivedPhotos(Thread):
+    def __init__(self):
+        Thread.__init__(self)
+
+        self.toplevel = Toplevel()
+
+        self.t = Text(self.toplevel, width=50, height=40, bg="black", fg="white")
+        self.t.grid(row=0, column=0)
+
+        self.scroll = Scrollbar(self.toplevel, orient="vertical", command=self.t.yview)
+        self.t.config(yscrollcommand=self.scroll.set)
+        self.scroll.grid(row=0, column=1, sticky=N + S + W)
+
+        im = Image.open("demo1.jpg")
+        self.img1 = ImageTk.PhotoImage(im)
+        self.lbl1 = Label(image=self.img1)
+        self.t.window_create(5.0, window=self.lbl1)
+
+        im2 = Image.open("demo2.jpg")
+        self.img2 = ImageTk.PhotoImage(im2)
+        self.lbl2 = Label(image=self.img2)
+        self.t.window_create(20.0, window=self.lbl2)
+
+        self.alive = True
+
+    def run(self):
+        while self.alive:
+            try:
+                self.toplevel.update()
+            except:
+                try:
+                    self.toplevel.destroy()
+                except:
+                    pass
+                self.alive = False
+                exit(0)
+
+    def stop(self):
+        self.alive = False
+"""
+
+
 class Main:
+    # Menu buttons logic
+
+    # Exit button
+    def exit(self):
+        self.client.s.send(self.exitPacketBytes + b'--')
+        self.client.s.close()
+        self.root.destroy()
+        self.alive = False
+
+    # "Save chat history to file" button
+    def saveToFile(self):
+        path = asksaveasfilename()
+        if len(path) > 0:
+            try:
+                f = open(path, 'w')
+                f.write(self.text.get(0.0, END))
+                f.close()
+
+                showinfo(title="Succefully saved chat history",
+                         message="Success. You can find it here: " + path)
+            except Exception as e:
+                showerror(title="Failed to save chat history",
+                          message="Error: " + str(e))
+
+    # "Received files" button
+    def receivedFiles(self):
+        pass
+
     def __init__(self, ip, port, nick, key):
         self.ip, self.port, self.nick, self.key = ip, port, nick, key
 
@@ -97,31 +175,34 @@ class Main:
 
         self.windowClosed = False
         self.root = Tk()
-        self.root.title('SecureChat 0.81 - ' + self.nick)
+        self.root.title('SecureChat 0.83 - ' + self.nick)
         self.root["bg"] = "black"
         self.root.resizable(False, False)
 
-        """
-        self.messages = []
-        self.timestamps = []
-        self.labels = []
-        self.tLabels = []
-        """
+        self.mainmenu = Menu(self.root)
+        self.root.config(menu=self.mainmenu)
 
-        """
-        for i in range(15):
-            self.timestamps.append('')
-            l = Label(width=10, bg="black", fg="white")
-            l.grid(row=i, column=0, padx=5)
-            l['text'] = ''
-            self.tLabels.append(l)
+        self.filemenu = Menu(self.mainmenu, tearoff=0)
+        self.filemenu.add_command(label="Save chat history to a file", command=self.saveToFile)
+        self.filemenu.add_separator()
+        self.filemenu.add_command(label="Exit", command=self.exit)
 
-            self.messages.append('')
-            l = Label(width=80, bg="black", fg="white", anchor=W)
-            l.grid(row=i, column=1, padx=5)
-            l['text'] = ''
-            self.labels.append(l)
-        """
+        self.settingsmenu = Menu(self.mainmenu, tearoff=0)
+        self.settingsmenu.add_command(label="Color theme")
+        self.settingsmenu.add_command(label="Sound")
+        self.settingsmenu.add_command(label="Window size")
+
+        self.chatmenu = Menu(self.mainmenu, tearoff=0)
+        self.chatmenu.add_command(label="People in this chat")
+        self.chatmenu.add_command(label="All received files", command=self.receivedFiles)
+
+        self.helpmenu = Menu(self.mainmenu, tearoff=0)
+        self.helpmenu.add_command(label="About SecureChat")
+
+        self.mainmenu.add_cascade(label="File", menu=self.filemenu)
+        self.mainmenu.add_cascade(label="Settings", menu=self.settingsmenu)
+        self.mainmenu.add_cascade(label="Chat", menu=self.chatmenu)
+        self.mainmenu.add_cascade(label="Help", menu=self.helpmenu)
 
         i = 0
 
@@ -130,9 +211,7 @@ class Main:
         self.text = Text(self.tFrame, state=DISABLED, width=110, height=15, bg="black", fg="white")
         self.text.grid(row=0,column=0, columnspan=3, padx=10, pady=5)
 
-        self.messageHistoryScroll = Scrollbar(self.tFrame, orient="vertical", command=self.text.yview,
-                                              activebackground="black", bg="black",
-                                              highlightbackground="black")
+        self.messageHistoryScroll = Scrollbar(self.tFrame, orient="vertical", command=self.text.yview)
         self.text.config(yscrollcommand=self.messageHistoryScroll.set)
         self.messageHistoryScroll.grid(row=0, column=3, sticky=N+S+W)
 
@@ -162,7 +241,11 @@ class Main:
                                               selectcolor="gray")
         self.encryptCheckButton.grid(row=i+2, column=2)
 
-        while True:
+        self.threads = []
+
+        self.alive = True
+
+        while self.alive:
             try:
                 self.root.update()
                 self.client.tick()
@@ -177,6 +260,11 @@ class Main:
                 self.client.s.close()
                 break
 
+        for thread in self.threads:
+            thread.stop()
+
+        exit(0)
+
     def coloredOutput(self, bg, fg, text):
         try:
             a = []
@@ -184,18 +272,18 @@ class Main:
                 a.append(len(line))
 
             if len(a) <= 10:
-                label = Text(bg=bg, fg=fg, width=max(a), height=len(a), borderwidth=0)
+                label = Text(self.text, bg=bg, fg=fg, width=max(a), height=len(a), borderwidth=0)
                 label.insert(1.0, text)
                 label.configure(state=DISABLED)
             else:
                 msg = "~ too many lines! 10 is max, but there's " + str(len(a)) + " lines in this message ~"
-                label = Text(bg="red", fg="white", width=len(msg), height=1, borderwidth=0)
+                label = Text(self.text, bg="red", fg="white", width=len(msg), height=1, borderwidth=0)
                 label.insert(1.0, msg)
                 label.configure(state=DISABLED)
         except Exception as e:
             print(e)
             msg = "Formatting error! Maybe your message is not properly formatted?"
-            label = Text(bg="red", fg="white", width=len(msg), height=1, borderwidth=0)
+            label = Text(self.text, bg="red", fg="white", width=len(msg), height=1, borderwidth=0)
             label.insert(1.0, msg)
             label.configure(state=DISABLED)
         self.text.window_create(END, window=label)
@@ -324,6 +412,8 @@ class Main:
                 self.client.send(p.asstring())
 
     def sendFile(self, _=None):
+        global PHOTOS
+
         toEncrypt = self.encryptFile.get()
 
         err = False
@@ -372,7 +462,19 @@ class Main:
 
                 print('Sended file')
 
-                self.history.addNew('You sended a file!')
+                if fileFormat in ['png', 'jpg', 'gif']:
+                    try:
+                        self.history.addNew("")
+                        self.img = Image.open(name)
+                        w, h = self.img.size
+                        ratio = min(MAX_IMG_WIDTH / w, MAX_IMG_HEIGHT / h)
+                        newsize = (w * ratio, h * ratio)
+                        self.img.thumbnail(newsize, Image.ANTIALIAS)
+                        self.photo = ImageTk.PhotoImage(self.img)
+                        PHOTOS.append(self.photo)
+                        self.text.image_create(END, image=PHOTOS[len(PHOTOS)-1])
+                    except Exception as e:
+                        self.coloredOutput("red", "white", "Exception while displaying image thumbnail:\n" + str(e))
 
                 time.sleep(0.5)
 
@@ -465,6 +567,21 @@ class Main:
 
                                     showinfo(title='Success!', message='Succefully downloaded file. Path: ' + str(path) +
                                              '.' + m['fileformat'])
+
+                                    if m['fileformat'] in ['png', 'jpg', 'gif']:
+                                        try:
+                                            self.history.addNew("")
+                                            self.img = Image.open(path + '.' + m['fileformat'])
+                                            w, h = self.img.size
+                                            ratio = min(MAX_IMG_WIDTH / w, MAX_IMG_HEIGHT / h)
+                                            newsize = (w * ratio, h * ratio)
+                                            self.img.thumbnail(newsize, Image.ANTIALIAS)
+                                            self.photo = ImageTk.PhotoImage(self.img)
+                                            PHOTOS.append(self.photo)
+                                            self.text.image_create(END, image=PHOTOS[len(PHOTOS) - 1])
+                                        except Exception as e:
+                                            self.coloredOutput("red", "white",
+                                                               "Exception while displaying image thumbnail:\n"+str(e))
                             else:
                                 showwarning(title='Error receiving file',
                                             message='Unable to receive file from server. Please try again.')
