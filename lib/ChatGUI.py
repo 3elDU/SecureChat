@@ -1,4 +1,6 @@
 from tkinter import *
+from tkinter import ttk
+
 from lib import MessageHistory
 from lib import Client
 from lib import EncryptionEngine
@@ -9,9 +11,12 @@ from tkinter.filedialog import *
 from PIL import Image, ImageTk
 from winsound import *
 from threading import Thread
+import datetime
 import socket
 import traceback
 import time
+import random
+import os
 
 
 MAX_IMG_WIDTH = 600
@@ -74,29 +79,80 @@ class SoundPlayerThread(Thread):
         exit(0)
 
 
-"""
-class ReceivedPhotos(Thread):
-    def __init__(self):
+class ReceivedFiles(Thread):
+    __letters = list('ABCDEFabcdef0123456789')
+
+    def __ranstring(self, len):
+        return "".join([random.choice(self.__letters) for _ in range(len)])
+
+    def __init__(self, sendedFiles, receivedFiles):
+        self.sended = sendedFiles
+        self.received = receivedFiles
+
         Thread.__init__(self)
 
         self.toplevel = Toplevel()
+        self.toplevel.resizable(True, True)
 
-        self.t = Text(self.toplevel, width=50, height=40, bg="black", fg="white")
-        self.t.grid(row=0, column=0)
+        self.mainframe = Frame(self.toplevel)
 
-        self.scroll = Scrollbar(self.toplevel, orient="vertical", command=self.t.yview)
-        self.t.config(yscrollcommand=self.scroll.set)
-        self.scroll.grid(row=0, column=1, sticky=N + S + W)
+        self.tree = ttk.Treeview(self.mainframe)
 
-        im = Image.open("demo1.jpg")
-        self.img1 = ImageTk.PhotoImage(im)
-        self.lbl1 = Label(image=self.img1)
-        self.t.window_create(5.0, window=self.lbl1)
+        self.tree['columns'] = ("one", "two", "three")
+        self.tree.column('#0', width=100, minwidth=10)
+        self.tree.column("one", width=200, minwidth=50)
+        self.tree.column("two", width=50, minwidth=1)
+        self.tree.column("three", width=25, minwidth=25)
 
-        im2 = Image.open("demo2.jpg")
-        self.img2 = ImageTk.PhotoImage(im2)
-        self.lbl2 = Label(image=self.img2)
-        self.t.window_create(20.0, window=self.lbl2)
+        self.tree.heading("#0", text="Filename")
+        self.tree.heading("one", text="Path to file")
+        self.tree.heading("two", text="Date received / sended")
+        self.tree.heading("three", text="File size")
+
+        if len(self.received) > 0:
+            received = self.tree.insert("", 1, text="Received files", values=("", ""))
+
+            for file in self.received:
+                size = str(round(file[3] / 1024, 2)) + " KB"
+
+                self.tree.insert(received, 1, text=file[0],
+                                 values=(file[1], file[2], size))
+
+        if len(self.sended) > 0:
+            sended = self.tree.insert("", 1, text="Sended files", values=("", ""))
+
+            for file in self.sended:
+                size = str(round(file[3] / 1024, 2)) + " KB"
+
+                self.tree.insert(sended, 1, text=file[0],
+                                 values=(file[1], file[2], size))
+
+        """        
+        for _ in range(random.randrange(5, 25)):
+            folder1 = self.tree.insert("", 1, text=self.__ranstring(8),
+                                       values=(self.__ranstring(10), self.__ranstring(18)))
+
+            for __ in range(random.randrange(10,20)):
+                folder2 = self.tree.insert(folder1, 1, text=self.__ranstring(5),
+                                           values=(self.__ranstring(10), self.__ranstring(18)))
+
+                for ___ in range(random.randrange(1, 3)):
+                    self.tree.insert(folder2, "end", text=self.__ranstring(random.randrange(3,15)),
+                                     values=(self.__ranstring(random.randrange(5,  15)), self.__ranstring(18)))
+        """
+
+
+        self.tree.bind("<Double-1>", self.processClick)
+
+        self.tree.grid(row=0, column=0, sticky=N + E + W + S)
+
+        self.scroll = Scrollbar(self.mainframe, orient="vertical", command=self.tree.yview)
+        self.tree.config(yscrollcommand=self.scroll.set)
+        self.scroll.grid(row=0, column=1, sticky=N + E + W + S)
+
+        self.mainframe.pack(fill=BOTH, expand=1)
+        self.mainframe.grid_columnconfigure(0, weight=1)
+        self.mainframe.grid_rowconfigure(0, weight=1)
 
         self.alive = True
 
@@ -112,9 +168,19 @@ class ReceivedPhotos(Thread):
                 self.alive = False
                 exit(0)
 
+            time.sleep(1 / 120)
+
+        exit(0)
+
+    def processClick(self, event):
+        try:
+            item = self.tree.selection()[0]
+            print("You clicked on", self.tree.item(item, "text"))
+        except:
+            pass
+
     def stop(self):
         self.alive = False
-"""
 
 
 class Main:
@@ -144,7 +210,9 @@ class Main:
 
     # "Received files" button
     def receivedFiles(self):
-        pass
+        t = ReceivedFiles(self.sendedFiles, self.receivedFiles)
+        t.start()
+        self.threads.append(t)
 
     def __init__(self, ip, port, nick, key):
         self.ip, self.port, self.nick, self.key = ip, port, nick, key
@@ -175,7 +243,7 @@ class Main:
 
         self.windowClosed = False
         self.root = Tk()
-        self.root.title('SecureChat 0.83 - ' + self.nick)
+        self.root.title('SecureChat 0.91 - ' + self.nick)
         self.root["bg"] = "black"
         self.root.resizable(False, False)
 
@@ -194,7 +262,7 @@ class Main:
 
         self.chatmenu = Menu(self.mainmenu, tearoff=0)
         self.chatmenu.add_command(label="People in this chat")
-        self.chatmenu.add_command(label="All received files", command=self.receivedFiles)
+        self.chatmenu.add_command(label="All received and sended files", command=self.receivedFiles)
 
         self.helpmenu = Menu(self.mainmenu, tearoff=0)
         self.helpmenu.add_command(label="About SecureChat")
@@ -242,6 +310,9 @@ class Main:
         self.encryptCheckButton.grid(row=i+2, column=2)
 
         self.threads = []
+
+        self.sendedFiles = []
+        self.receivedFiles = []
 
         self.alive = True
 
@@ -462,6 +533,17 @@ class Main:
 
                 print('Sended file')
 
+                t = datetime.datetime.now()
+                p = name.replace('/', '\\').split('\\')
+                self.sendedFiles.append([
+                    p[len(p)-1],
+                    str(name),
+                    t.strftime("%d-%b-%Y (%H:%M:%S)"),
+                    os.path.getsize(name)
+                ])
+
+                print(self.sendedFiles)
+
                 if fileFormat in ['png', 'jpg', 'gif']:
                     try:
                         self.history.addNew("")
@@ -475,6 +557,8 @@ class Main:
                         self.text.image_create(END, image=PHOTOS[len(PHOTOS)-1])
                     except Exception as e:
                         self.coloredOutput("red", "white", "Exception while displaying image thumbnail:\n" + str(e))
+                else:
+                    self.history.addNew("You've sent a file: " + p[len(p)-1])
 
                 time.sleep(0.5)
 
@@ -567,6 +651,17 @@ class Main:
 
                                     showinfo(title='Success!', message='Succefully downloaded file. Path: ' + str(path) +
                                              '.' + m['fileformat'])
+
+                                    t = datetime.datetime.now()
+                                    p = path.replace('/', '\\').split('\\')
+                                    self.receivedFiles.append([
+                                        p[len(p)-1],
+                                        str(path),
+                                        t.strftime("%d-%b-%Y (%H:%M:%S)"),
+                                        os.path.getsize(path+'.'+m['fileformat'])
+                                    ])
+
+                                    print(self.receivedFiles)
 
                                     if m['fileformat'] in ['png', 'jpg', 'gif']:
                                         try:
